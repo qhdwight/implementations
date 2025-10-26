@@ -17,7 +17,8 @@ def main():
     ])
     h = np.array([+1, -1, -1])
 
-    # Phase I: Solve min sum(z) subject to Gx + Is + Ez = h, x,s,z >= 0
+    # Phase  I: Solve min sum(z) subject to Gx + Is + Ez = h, x,s,z >= 0
+    # Phase II: Solve min  c^T x subject to Gx + Is + Iz = h, x,s,z >= 0
     m, n = G.shape
     I = sp.eye(m, format='csc')
     E = sp.diags(np.where(h >= 0.0, +1.0, -1.0), 0, format='csc')
@@ -25,39 +26,40 @@ def main():
     k = np.concatenate([np.zeros(n), np.zeros(m), np.ones(m)])
     basis = list(range(n + m, n + m + m))  # Select z variables as initial basis
     nonbasic = list(range(n + m))
-    # Phase II: Solve min c^T x subject to Gx + Is + Iz = h, x,s,z >= 0
 
     phase = 0
-    for it in range(64):
+    for it in range(1024):
         B, N = A[:, basis], A[:, nonbasic]
         yb = sp.linalg.spsolve(B, h)
         assert np.all(yb >= 0.0)
         cb, cn = k[basis], k[nonbasic]
-        lam = sp.linalg.spsolve(B.T, cb)
-        sn = cn - N.T @ lam
+        lamda = sp.linalg.spsolve(B.T, cb)
+        sn = cn - N.T @ lamda
         if np.all(sn >= 0.0):
             y = np.zeros(n + m + m)
             y[basis] = yb
-            if phase == 0:
-                z = y[n + m:]
-                if np.dot(k, y) > 0.0:
-                    raise ValueError("Infeasible problem")
-                assert np.all(z <= 1e-8)
-                A = sp.hstack([G, I, I], format='csc')
-                k = np.concatenate([c, np.zeros(m), np.zeros(m)])
-                phase = 1
-                continue
-            elif phase == 1:
-                x = y[:n]
-                J = np.dot(c, x)
-                break
-            else:
-                raise ValueError("Invalid phase")
-        q = nonbasic[np.argmin(sn)]
+            match phase:
+                case 0:
+                    z = y[n + m:]
+                    if np.dot(k, y) > 0.0:
+                        raise ValueError("Infeasible problem")
+                    assert np.all(z <= 1e-8)
+                    A = sp.hstack([G, I, I], format='csc')
+                    k = np.concatenate([c, np.zeros(m), np.zeros(m)])
+                    phase = 1
+                    continue
+                case 1:
+                    x = y[:n]
+                    J = np.dot(c, x)
+                    break
+                case _:
+                    raise ValueError("Invalid phase")
+        q_index = np.argmin(sn)
+        q = nonbasic[q_index]
         d = sp.linalg.spsolve(B, A[:, q])
         if np.all(d <= 0.0):
             raise ValueError("Problem is unbounded")
-        _, p_index = line_search(yb, d)
+        _alpha, p_index = line_search(yb, d)
         p = basis[p_index]
         # Update basis
         basis[p_index] = q
