@@ -1,21 +1,11 @@
-import scipy.sparse as sp
-import numpy as np
 import cvxpy as cp
+import numpy as np
+import scipy.sparse as sp
+
+from common import line_search
 
 
-def alpha(x: np.ndarray, dx: np.ndarray) -> tuple[float, int]:
-    assert len(x) == len(dx) and len(x) > 0 and len(dx) > 0
-    alpha_val = np.inf
-    p_index = -1
-    for i in range(len(x)):
-        if dx[i] <= 0.0:
-            continue
-        ratio = x[i] / dx[i]
-        if ratio < alpha_val:
-            alpha_val = ratio
-            p_index = i
-    return alpha_val, p_index
-
+# "Numerical Optimization" by Nocedal and Wright, Section 13.3
 
 def main():
     # Solve min c^T x subject to Gx <= h, x >= 0
@@ -67,7 +57,7 @@ def main():
         d = sp.linalg.spsolve(B, A[:, q])
         if np.all(d <= 0.0):
             raise ValueError("Problem is unbounded")
-        ratios, p_index = alpha(yb, d)
+        _, p_index = line_search(yb, d)
         p = basis[p_index]
         # Update basis
         basis[p_index] = q
