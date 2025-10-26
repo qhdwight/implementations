@@ -31,12 +31,12 @@ def main():
         cb, cn = k[basis], k[nonbasic]
         lamda = sp.linalg.spsolve(B.T, cb)
         sn = cn - N.T @ lamda
-        if np.any(yb < 0.0):
-            raise ValueError("Initial basis is not dual feasible")
         if np.all(yb >= 0.0):
             y = np.zeros(n + m + m)
             y[basis] = yb
-            x = y[:n]
+            x, s = y[:n], y[n:n + m]
+            if np.any(s < 0.0):
+                raise ValueError("Unbounded problem")
             J = np.dot(c, x)
             break
         q_index = np.argmin(yb)
@@ -44,12 +44,10 @@ def main():
         e_q[q_index] = 1.0
         v = sp.linalg.spsolve(-B.T, e_q)
         w = N.T @ v
+        if np.all(w <= 0.0):
+            raise ValueError("Infeasible problem")
         _alpha, r_index = line_search(sn, w)
         r = nonbasic[r_index]
-        # d = sp.linalg.spsolve(B, A[:, r])
-        # if np.all(d <= 0.0):
-        #     raise ValueError("Problem is unbounded")
-        # _gamma, p_index = line_search(yb, d)
         q = basis[q_index]
         # Update basis
         basis[q_index] = r

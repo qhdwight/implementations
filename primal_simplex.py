@@ -58,7 +58,7 @@ def main():
         q = nonbasic[q_index]
         d = sp.linalg.spsolve(B, A[:, q])
         if np.all(d <= 0.0):
-            raise ValueError("Problem is unbounded")
+            raise ValueError("Unbounded problem")
         _alpha, p_index = line_search(yb, d)
         p = basis[p_index]
         # Update basis
