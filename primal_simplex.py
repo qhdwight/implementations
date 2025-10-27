@@ -7,6 +7,8 @@ import scipy.sparse as sp
 from common import line_search
 
 
+# Solve min c^T x subject to Gx <= h, x >= 0
+#
 # "Numerical Optimization" by Nocedal and Wright, Section 13.3
 
 def primal_simplex(c: np.ndarray, G: sp.csc_matrix, h: np.ndarray) -> tuple[np.ndarray, float, int]:
@@ -65,7 +67,6 @@ def primal_simplex(c: np.ndarray, G: sp.csc_matrix, h: np.ndarray) -> tuple[np.n
 
 class Tests(unittest.TestCase):
     def test_feasible(self):
-        # Solve min c^T x subject to Gx <= h, x >= 0
         c = np.array([-1, -2])
         G = sp.csc_matrix([
             [+1, +1],
@@ -82,10 +83,41 @@ class Tests(unittest.TestCase):
 
         self.assertTrue(np.isclose(J, J_cp))
 
-        print("Optimal value:", J)
-        print("CVXPY Solution:", x_cp.value)
-        print("Simplex Solution:", x)
-        print("Simplex iterations:", it)
+    def test_unbounded(self):
+        c = np.array([-1, -1])
+        G = sp.csc_matrix([
+            [-1, -1],
+            [-1, -1],
+        ])
+        h = np.array([-1, -2])
+
+        x_cp = cp.Variable(len(c), nonneg=True)
+        problem = cp.Problem(
+            cp.Minimize(c @ x_cp), [G @ x_cp <= h]
+        )
+        problem.solve()
+        self.assertEqual(problem.status, cp.UNBOUNDED)
+
+        with self.assertRaises(ValueError):
+            primal_simplex(c, G, h)
+
+    def test_infeasible(self):
+        c = np.array([-1, -1])
+        G = sp.csc_matrix([
+            [-1, -1],
+            [+1, +1],
+        ])
+        h = np.array([-2, +1])
+
+        x_cp = cp.Variable(len(c), nonneg=True)
+        problem = cp.Problem(
+            cp.Minimize(c @ x_cp), [G @ x_cp <= h]
+        )
+        problem.solve()
+        self.assertEqual(problem.status, cp.INFEASIBLE)
+
+        with self.assertRaises(ValueError):
+            primal_simplex(c, G, h)
 
 
 if __name__ == '__main__':

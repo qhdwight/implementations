@@ -7,6 +7,8 @@ import scipy.sparse as sp
 from common import line_search
 
 
+# Solve min c^T x subject to Gx <= h, x >= 0
+#
 # "Numerical Optimization" by Nocedal and Wright, Section 13.6
 
 def dual_simplex(c: np.ndarray, G: sp.csc_matrix, h: np.ndarray) -> tuple[np.ndarray, float, int]:
@@ -27,9 +29,7 @@ def dual_simplex(c: np.ndarray, G: sp.csc_matrix, h: np.ndarray) -> tuple[np.nda
         if np.all(yb >= 0.0):
             y = np.zeros(n + m + m)
             y[basis] = yb
-            x, s = y[:n], y[n:n + m]
-            if np.any(s < 0.0):
-                raise ValueError("Unbounded problem")
+            x = y[:n]
             J = np.dot(c, x)
             break
         q_index = np.argmin(yb)
@@ -53,7 +53,6 @@ def dual_simplex(c: np.ndarray, G: sp.csc_matrix, h: np.ndarray) -> tuple[np.nda
 
 class Tests(unittest.TestCase):
     def test_feasible(self):
-        # Solve min c^T x subject to Gx <= h, x >= 0
         c = np.array([-1, -2])
         G = sp.csc_matrix([
             [+1, +1],
@@ -70,10 +69,23 @@ class Tests(unittest.TestCase):
 
         self.assertTrue(np.isclose(J, J_cp))
 
-        print("Optimal value:", J)
-        print("CVXPY Solution:", x_cp.value)
-        print("Simplex Solution:", x)
-        print("Simplex iterations:", it)
+    def test_infeasible(self):
+        c = np.array([-1, -1])
+        G = sp.csc_matrix([
+            [-1, -1],
+            [+1, +1],
+        ])
+        h = np.array([-2, +1])
+
+        x_cp = cp.Variable(len(c), nonneg=True)
+        problem = cp.Problem(
+            cp.Minimize(c @ x_cp), [G @ x_cp <= h]
+        )
+        problem.solve()
+        self.assertEqual(problem.status, cp.INFEASIBLE)
+
+        with self.assertRaises(ValueError):
+            dual_simplex(c, G, h)
 
 
 if __name__ == '__main__':
