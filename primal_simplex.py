@@ -1,3 +1,5 @@
+import unittest
+
 import cvxpy as cp
 import numpy as np
 import scipy.sparse as sp
@@ -7,16 +9,7 @@ from common import line_search
 
 # "Numerical Optimization" by Nocedal and Wright, Section 13.3
 
-def main():
-    # Solve min c^T x subject to Gx <= h, x >= 0
-    c = np.array([-1, -2])
-    G = sp.csc_matrix([
-        [+1, +1],
-        [-2, -1],
-        [-1, -2],
-    ])
-    h = np.array([+1, -1, -1])
-
+def primal_simplex(c: np.ndarray, G: sp.csc_matrix, h: np.ndarray) -> tuple[np.ndarray, float, int]:
     # Phase  I: Solve min sum(z) subject to Gx + Is + Ez = h, x,s,z >= 0
     # Phase II: Solve min  c^T x subject to Gx + Is + Iz = h, x,s,z >= 0
     m, n = G.shape
@@ -67,18 +60,33 @@ def main():
     else:
         raise ValueError("Maximum iterations exceeded")
 
-    x_cp = cp.Variable(n, nonneg=True)
-    J_cp = cp.Problem(
-        cp.Minimize(c @ x_cp), [G @ x_cp <= h]
-    ).solve()
+    return x, J, it + 1
 
-    assert np.isclose(J, J_cp)
 
-    print("Optimal value:", J)
-    print("CVXPY Solution:", x_cp.value)
-    print("Simplex Solution:", x)
-    print("Simplex iterations:", it + 1)
+class Tests(unittest.TestCase):
+    def test_feasible(self):
+        # Solve min c^T x subject to Gx <= h, x >= 0
+        c = np.array([-1, -2])
+        G = sp.csc_matrix([
+            [+1, +1],
+            [-2, -1],
+            [-1, -2],
+        ])
+        h = np.array([+1, -1, -1])
+        x, J, it = primal_simplex(c, G, h)
+
+        x_cp = cp.Variable(len(c), nonneg=True)
+        J_cp = cp.Problem(
+            cp.Minimize(c @ x_cp), [G @ x_cp <= h]
+        ).solve()
+
+        self.assertTrue(np.isclose(J, J_cp))
+
+        print("Optimal value:", J)
+        print("CVXPY Solution:", x_cp.value)
+        print("Simplex Solution:", x)
+        print("Simplex iterations:", it)
 
 
 if __name__ == '__main__':
-    main()
+    unittest.main()
